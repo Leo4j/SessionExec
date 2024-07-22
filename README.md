@@ -18,7 +18,7 @@ Or you can use `Invoke-SessionExec.ps1` which is the same script, but runs in me
 iex(new-object net.webclient).downloadstring('https://raw.githubusercontent.com/Leo4j/SessionExec/main/Invoke-SessionExec.ps1')
 ```
 
-NOTE: SYSTEM privileges are required to run this tool successfully
+NOTE: SYSTEM privileges are required to run this tool successfully. To elevate from Administrator to SYSTEM, use [Invoke-RunAsSystem](https://github.com/Leo4j/Invoke-RunAsSystem)
 
 ## Usage
 
