@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 
 namespace SessionExec
 {
@@ -103,6 +105,12 @@ namespace SessionExec
         [DllImport("wtsapi32.dll", SetLastError = true)]
         static extern bool WTSQueryUserToken(int sessionId, out IntPtr Token);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool CreatePipe(out IntPtr hReadPipe, out IntPtr hWritePipe, ref SECURITY_ATTRIBUTES lpPipeAttributes, int nSize);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool SetHandleInformation(IntPtr hObject, uint dwMask, uint dwFlags);
+
         public static IEnumerable<int> GetSessionIds()
         {
             List<int> sids = new List<int>();
@@ -148,7 +156,7 @@ namespace SessionExec
         {
             if (args.Length < 2)
             {
-                Console.WriteLine("Usage: SessionExec.exe <SessionID|All> <Command> [/NoOutput]");
+                Console.WriteLine("Usage: Invoke-SessionExec <SessionID|All> <Command> [/NoOutput]");
                 return;
             }
 
@@ -198,34 +206,81 @@ namespace SessionExec
                 throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
             }
 
-            STARTUPINFO si = new STARTUPINFO();
-            PROCESS_INFORMATION pi = new PROCESS_INFORMATION();
-            si.cb = Marshal.SizeOf(si);
             SECURITY_ATTRIBUTES sa = new SECURITY_ATTRIBUTES();
             sa.nLength = Marshal.SizeOf(sa);
+            sa.bInheritHandle = true;
+
+            IntPtr stdoutReadPipe, stdoutWritePipe;
+            IntPtr stderrReadPipe, stderrWritePipe;
+
+            // Create pipes for stdout and stderr
+            CreatePipe(out stdoutReadPipe, out stdoutWritePipe, ref sa, 0);
+            CreatePipe(out stderrReadPipe, out stderrWritePipe, ref sa, 0);
+
+            STARTUPINFO si = new STARTUPINFO();
+            si.cb = Marshal.SizeOf(si);
+            si.hStdOutput = stdoutWritePipe;
+            si.hStdError = stderrWritePipe;
+            si.dwFlags = 0x00000100; // STARTF_USESTDHANDLES
+
+            PROCESS_INFORMATION pi = new PROCESS_INFORMATION();
 
             string powershellPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
             string arguments = $"-Command \"{command}\"";
 
             uint creationFlags = NoOutput ? (uint)0x08000000 /* CREATE_NO_WINDOW */ : 0;
 
-            if (!CreateProcessAsUser(userToken, powershellPath, arguments, ref sa, ref sa, false, creationFlags, IntPtr.Zero, null, ref si, out pi))
+            if (!CreateProcessAsUser(userToken, powershellPath, arguments, ref sa, ref sa, true, creationFlags, IntPtr.Zero, null, ref si, out pi))
             {
                 throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
             }
 
+            // Close write end of the pipes to avoid hanging
+            CloseHandle(stdoutWritePipe);
+            CloseHandle(stderrWritePipe);
+
             if (!NoOutput)
             {
-                // Wait for the process to complete and capture the output
+                // Read the output from the pipes asynchronously
+                Task<string> outputTask = ReadStreamAsync(stdoutReadPipe);
+                Task<string> errorTask = ReadStreamAsync(stderrReadPipe);
+
+                // Wait for the process to complete
                 using (Process process = Process.GetProcessById(pi.dwProcessId))
                 {
                     process.WaitForExit();
+                }
+
+                // Get the output and error
+                string output = outputTask.Result;
+                string error = errorTask.Result;
+
+                if (!string.IsNullOrEmpty(output))
+                {
+                    Console.WriteLine(output);
+                }
+
+                else if (!string.IsNullOrEmpty(error))
+                {
+                    Console.WriteLine("Error: " + error);
                 }
             }
 
             CloseHandle(pi.hProcess);
             CloseHandle(pi.hThread);
             CloseHandle(userToken);
+            CloseHandle(stdoutReadPipe);
+            CloseHandle(stderrReadPipe);
+        }
+
+        public static async Task<string> ReadStreamAsync(IntPtr handle)
+        {
+            using (SafeFileHandle safeHandle = new SafeFileHandle(handle, ownsHandle: false))
+            using (FileStream stream = new FileStream(safeHandle, FileAccess.Read, 4096, false))
+            using (StreamReader reader = new StreamReader(stream, Encoding.Default))
+            {
+                return await reader.ReadToEndAsync();
+            }
         }
     }
 }
