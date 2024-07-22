@@ -1,6 +1,6 @@
 # SessionExec
 
-SessionExec allows you to execute specified commands in different user sessions on Windows systems, either targeting a specific session ID or all sessions, with the option to suppress command output.
+SessionExec allows you to execute specified commands in other Sessions on Windows Systems, either targeting a specific session ID or All sessions, with the option to suppress command output.
 
 The tool is inspired to the [EOP COM Session Moniker](https://bugs.chromium.org/p/project-zero/issues/detail?id=1021) exploit code, released a long time ago by James Forshaw.
 
