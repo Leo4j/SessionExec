@@ -156,7 +156,7 @@ namespace SessionExec
         {
             if (args.Length < 2)
             {
-                Console.WriteLine("Usage: Invoke-SessionExec <SessionID|All> <Command> [/NoOutput]");
+                Console.WriteLine("Usage: SessionExec.exe <SessionID|All> <Command> [/NoOutput]");
                 return;
             }
 
