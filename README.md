@@ -41,7 +41,7 @@ If they do, you could then repeat the process for users having a session on thos
 
 Additionally, you could obtain shells back using [Amnesiac](https://github.com/Leo4j/Amnesiac), capture NTLMv2 hashes and relay them, grab TGTs, and much much more, all in an automated fashion.
 
-Together with [The-Viper-One](https://github.com/The-Viper-One), we are working on implementing this concept into [PsMapExec](https://github.com/The-Viper-One/PsMapExec). 
+I'll implement this concept into [Amnesiac](https://github.com/Leo4j/Amnesiac), and together with [The-Viper-One](https://github.com/The-Viper-One), we are working on implementing it into [PsMapExec](https://github.com/The-Viper-One/PsMapExec) too.
 
 For now, here is a Proof of Concept (PoC):
 
